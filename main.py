@@ -1,9 +1,7 @@
 
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, url_for
 import sqlite3
 from datetime import date
-import calendar
-from flask import Flask, request, redirect, url_for
 
 app = Flask(__name__)
 DB = "kakeibo.db"
@@ -73,17 +71,6 @@ def index():
             (month,)
         ).fetchall()
 
-
-    with sqlite3.connect(DB) as conn:
-        total = conn.execute(
-            """
-            SELECT COALESCE(SUM(amount), 0)
-            FROM expenses
-            WHERE substr(date, 1, 7) = ?
-            """,
-            (month,)
-        ).fetchone()[0]
-
     with sqlite3.connect(DB) as conn:
         total, days = conn.execute(
             """
@@ -122,24 +109,22 @@ def index():
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>家計簿</title>
     </head>
-    <h1>家計簿</h1>
-    <form method="GET" action="/">
-        <label>表示月：</label>
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-            <a href="/?month={prev_month}">
-                <button type="button">◀ 前月</button>
-            </a>
+    <h1>家計簿</h1>    
+    <label>表示月：</label>
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <a href="/?month={prev_month}">
+            <button type="button">◀ 前月</button>
+        </a>
 
-            <form method="GET" action="/" style="margin: 0;">
-                <input type="month" name="month" value="{month}">
-                <button type="submit">表示</button>
-            </form>
+        <form method="GET" action="/" style="margin: 0;">
+            <input type="month" name="month" value="{month}">
+            <button type="submit">表示</button>
+        </form>
 
-            <a href="/?month={next_month}">
-                <button type="button">翌月 ▶</button>
-            </a>
-        </div>
-    </form>
+        <a href="/?month={next_month}">
+            <button type="button">翌月 ▶</button>
+        </a>
+    </div>
 
     <form method="POST">
         <input type="date" name="date" value="{date.today()}" required>
@@ -158,13 +143,13 @@ def index():
     </form>
 
     <h2>支出履歴</h2>
-    <table border="1" cellpadding="8">
-        <tr><th>日付</th><th>項目</th><th>金額</th><th>操作</th></tr>
-        {rows}
+        <table border="1" cellpadding="8">
+            <tr><th>日付</th><th>項目</th><th>金額</th><th>操作</th></tr>
+            {rows}
+        </table>
         <h2>今月の集計</h2>
         <p>累計：{total:,}円</p>
         <p>1日平均：{average:,.0f}円</p>
-    </table>
     </html>
     """
 
