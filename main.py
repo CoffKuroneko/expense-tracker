@@ -118,8 +118,8 @@ def index():
         <tr>
             <td>{escape(day)}</td>
             <td>{escape(category)}</td>
-            <td>{escape(memo)}</td>
             <td>{amount:,}円</td>
+            <td>{escape(memo)}</td>
             <td>
                 <form action="{url_for('delete_expense', expense_id=expense_id, month=month)}"
                       method="POST"
@@ -188,8 +188,8 @@ def index():
         <tr>
             <th>日付</th>
             <th>項目</th>
-            <th>備考</th>
             <th>金額</th>
+            <th>備考</th>
             <th>操作</th>
         </tr>
         {rows}
