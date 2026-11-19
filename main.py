@@ -135,6 +135,7 @@ def index():
             <option>医療費</option>
             <option>交通費</option>
             <option>娯楽費</option>
+            <option>衣服費</option>
             <option>その他</option>
         </select>
 
