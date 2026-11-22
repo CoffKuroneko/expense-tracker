@@ -76,7 +76,7 @@ def index():
         amount = int(request.form["amount"])
         memo = request.form.get("memo", "").strip()
 
-        if amount > 0:
+        if amount >= 0:
             with sqlite3.connect(DB) as conn:
                 conn.execute(
                     """
@@ -172,10 +172,11 @@ def index():
             <option>娯楽費</option>
             <option>衣服費</option>
             <option>その他</option>
+            <option>No Spend Day</option>
         </select>
 
         <input type="number" name="amount"
-               min="1" required placeholder="金額">
+               min="0" required placeholder="金額">
         <br><br>
         <input type="text" name="memo"
                placeholder="備考（任意）">
