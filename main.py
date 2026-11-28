@@ -7,6 +7,17 @@ from html import escape
 app = Flask(__name__)
 DB = "kakeibo.db"
 
+CATEGORIES = [
+    "食費",
+    "日用品",
+    "医療費",
+    "交通費",
+    "娯楽費",
+    "衣服費",
+    "その他",
+    "No Spend Day"
+]
+
 
 def init_db():
     with sqlite3.connect(DB) as conn:
@@ -111,7 +122,132 @@ def index():
             (month,)
         ).fetchone()
 
+        # 項目別の月間集計
+        category_totals = dict(conn.execute(
+            """
+            SELECT category, SUM(amount)
+            FROM expenses
+            WHERE substr(date, 1, 7) = ?
+            GROUP BY category
+            """,
+            (month,)
+        ).fetchall())
+
+        # 日別集計
+        daily_totals = conn.execute(
+            """
+            SELECT date, SUM(amount)
+            FROM expenses
+            WHERE substr(date, 1, 7) = ?
+            GROUP BY date
+            ORDER BY date DESC
+            """,
+            (month,)
+        ).fetchall()
+
     average = total / days if days > 0 else 0
+
+    # グラフに表示する項目
+    graph_categories = [
+        category for category in CATEGORIES
+        if category != "No Spend Day"
+    ]
+
+    # 過去に登録した項目も表示
+    for category in category_totals:
+        if (
+            category != "No Spend Day"
+            and category not in graph_categories
+        ):
+            graph_categories.append(category)
+
+    # グラフの最大値
+    max_amount = max(
+        (
+            category_totals.get(category, 0)
+            for category in graph_categories
+        ),
+        default=0
+    )
+
+    # 項目別グラフの生成
+    graph_rows = ""
+
+    for category in graph_categories:
+        amount = category_totals.get(category, 0)
+
+        width = (
+            amount / max_amount * 100
+            if max_amount > 0 else 0
+        )
+
+        graph_rows += f"""
+        <div class="graph-item">
+            <div class="graph-label">
+                <span>{escape(category)}</span>
+                <span>{amount:,}円</span>
+            </div>
+            <div class="graph-track">
+                <div class="graph-bar"
+                     style="width: {width:.2f}%;">
+                </div>
+            </div>
+        </div>
+        """
+
+    
+    # 日別グラフの最大値
+    daily_max = max(
+        (amount for day, amount in daily_totals),
+        default=0
+    )
+
+    # 日別グラフの生成
+    daily_graph_rows = ""
+
+    for day, amount in daily_totals:
+
+        width = (
+            amount / daily_max * 100
+            if daily_max > 0 else 0
+        )
+
+        color = (
+            "#4caf50" if amount <= 1000
+            else "#c4a48b"
+        )
+
+        amount_label = (
+            "No Spend Day"
+            if amount == 0
+            else f"{amount:,}円"
+        )
+
+        daily_graph_rows += f"""
+        <div class="graph-item">
+            <div class="graph-label">
+                <span>{escape(day)}</span>
+                <span style="color: {color};">
+                    {amount_label}
+                </span>
+            </div>
+            <div class="graph-track">
+                <div class="graph-bar"
+                     style="width: {width:.2f}%;
+                            background-color: {color};">
+                </div>
+            </div>
+        </div>
+        """
+
+    if not daily_graph_rows:
+        daily_graph_rows = "<p>登録データがありません。</p>"
+
+    # 項目選択肢
+    options = "".join(
+        f"<option>{escape(category)}</option>"
+        for category in CATEGORIES
+    )
 
     rows = "".join(
         f"""
@@ -139,7 +275,42 @@ def index():
         <meta name="viewport"
               content="width=device-width, initial-scale=1">
         <title>家計簿</title>
+
+        <style>
+            .graph {{
+                max-width: 500px;
+                padding: 15px;
+                border: 1px solid #ccc;
+                border-radius: 8px;
+            }}
+
+            .graph-item {{
+                margin-bottom: 15px;
+            }}
+
+            .graph-label {{
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 5px;
+                gap: 10px;
+            }}
+
+            .graph-track {{
+                width: 100%;
+                height: 18px;
+                background-color: #eeeeee;
+                border-radius: 4px;
+                overflow: hidden;
+            }}
+
+            .graph-bar {{
+                height: 100%;
+                background-color: #4caf50;
+                border-radius: 4px;
+            }}
+        </style>
     </head>
+
     <body>
     <h1>家計簿</h1>
 
@@ -165,22 +336,17 @@ def index():
                value="{date.today()}" required>
 
         <select name="category">
-            <option>食費</option>
-            <option>日用品</option>
-            <option>医療費</option>
-            <option>交通費</option>
-            <option>娯楽費</option>
-            <option>衣服費</option>
-            <option>その他</option>
-            <option>No Spend Day</option>
+            {options}
         </select>
 
         <input type="number" name="amount"
                min="0" required placeholder="金額">
         <br><br>
+
         <input type="text" name="memo"
                placeholder="備考（任意）">
         <br><br>
+
         <button type="submit">登録</button>
     </form>
 
@@ -196,9 +362,28 @@ def index():
         {rows}
     </table>
 
-    <h2>今月の集計</h2>
+    <h2>{year}年{month_num}月の集計</h2>
     <p>累計：{total:,}円</p>
     <p>1日平均：{average:,.0f}円</p>
+
+    <h2>項目別集計</h2>
+    <div class="graph">
+        {graph_rows}
+    </div>
+
+    <h2>日別集計</h2>
+
+    <details>
+        <summary style="cursor: pointer; padding: 10px 0;">
+            日別支出を表示（{days}日分）
+        </summary>
+
+        <div class="graph">
+            <p>1日の支出目安：1,000円</p>
+            {daily_graph_rows}
+        </div>
+    </details>
+
     </body>
     </html>
     """
